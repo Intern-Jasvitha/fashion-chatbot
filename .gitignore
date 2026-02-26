@@ -1,0 +1,14 @@
+.env
+venv/
+data/
+.agents/
+.venv/
+.vscode/
+node_modules/
+FRD - Chatbot.docx
+TODO.md
+.claude/
+todofe.md
+self.md
+self-learning-phase-4-5-runbook.md
+self-learning-phase-6-8-runbook.md

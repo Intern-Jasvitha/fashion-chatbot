@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ai-fashion-postgres_db
+    environment:
+      POSTGRES_USER: ai-fashion
+      POSTGRES_PASSWORD: ai-fashion
+      POSTGRES_DB: ai-fashiondb
+    ports:
+      - "5438:5432"
+    volumes:
+      - ai-fashion-postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ai-fashion-qdrant_db
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ai-fashion-qdrant_data:/qdrant/storage
+    restart: always
+
+volumes:
+  ai-fashion-postgres_data:
+  ai-fashion-qdrant_data:

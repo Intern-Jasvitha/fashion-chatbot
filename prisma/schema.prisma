@@ -1,0 +1,629 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator db {
+  provider                      = "prisma-client-py"
+  interface                     = "asyncio"
+  recursive_type_depth          = -1
+  enable_experimental_decimal   = true
+}
+
+// ---------------------------------------------------------------------------
+// Lookup / reference data (from CSV files)
+// ---------------------------------------------------------------------------
+
+model Category {
+  id   Int    @id // CATEGORY_ID
+  name String @map("category_name") // CATEGORY_NAME
+  types Type[]
+
+  @@map("category")
+}
+
+model Type {
+  id         Int    @id // TYPE_ID
+  name       String @map("type_name") // TYPE_NAME
+  categoryId Int    @map("category_id")
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  products   Product[]
+
+  @@index([categoryId])
+  @@map("type")
+}
+
+model Size {
+  code        String   @id // SIZE_CODE (S, M, L)
+  description String?
+  products    Product[]
+
+  @@map("size")
+}
+
+model Color {
+  code String @id // COLOR_CODE (hex)
+  name String @map("color_name")
+  products Product[]
+
+  @@map("color")
+}
+
+model Gender {
+  id   Int    @id // GENDER_ID
+  name String @map("gender_name")
+  products Product[]
+
+  @@map("gender")
+}
+
+model Brand {
+  id    Int    @id // BRAND_ID
+  name  String @map("brand_name")
+  email String?
+  products Product[]
+
+  @@map("brand")
+}
+
+model CcpaymentType {
+  code        String @id // CCTYPE (AM, BK, MC, VS)
+  description String?
+  cards       CcpaymentCard[]
+
+  @@map("ccpayment_type")
+}
+
+model CcpaymentState {
+  code        Int    @id // CCSTATE (0-5)
+  description String?
+  payments    Ccpayment[]
+
+  @@map("ccpayment_state")
+}
+
+model CcentryMethod {
+  code        Int    @id // CCMETHOD (0, 1, 2)
+  description String?
+  cards       CcpaymentCard[]
+
+  @@map("ccentry_method")
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        Int     @id // CUSTOMER_ID
+  firstname String  @map("firstname")
+  lastname  String  @map("lastname")
+  dob       DateTime @db.Date
+  email     String?
+  phoneno   String?
+  tickets   Ticket[]
+  user      User?
+  chatEvents ChatEventLog[]
+  chatFeedback ChatFeedback[]
+  sessionFeatures SessionFeature[]
+  correctionMemories CorrectionMemory[]
+  handoffQueueItems HandoffQueue[]
+  learningConsentPreferences LearningConsentPreference[]
+  learningExclusionAudits LearningExclusionAudit[]
+
+  @@map("customer")
+}
+
+model Employee {
+  id        Int     @id // EMPLOYEE_ID
+  firstname String  @map("firstname")
+  lastname  String  @map("lastname")
+  dob       DateTime @db.Date
+  email     String?
+  phoneno   String?
+  tickets   Ticket[]
+
+  @@map("employee")
+}
+
+// ---------------------------------------------------------------------------
+// Auth (JWT login/signup)
+// ---------------------------------------------------------------------------
+
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  hashed_password String   @map("hashed_password")
+  name            String?
+  customerId      Int?     @unique @map("customer_id")
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  policyAudits    PolicyAudit[]
+  chatEvents      ChatEventLog[]
+  chatFeedback    ChatFeedback[]
+  sessionFeatures SessionFeature[]
+  correctionMemories CorrectionMemory[]
+  handoffQueueItems HandoffQueue[]
+  learningConsentPreference LearningConsentPreference?
+  learningExclusionAudits LearningExclusionAudit[]
+  goldenConversationRuns GoldenConversationRun[]
+  canaryRolloutRuns CanaryRolloutRun[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("user")
+}
+
+// ---------------------------------------------------------------------------
+// Payments (CCPAYMENT_ID can exceed 2^31, so BigInt)
+// ---------------------------------------------------------------------------
+
+model Ccpayment {
+  id               BigInt   @id // CCPAYMENT_ID
+  ccpayTranId      BigInt?  @map("ccpaytran_id") // CCPAYTRAN_ID
+  expectedAmount   Decimal  @map("expected_amount") @db.Decimal(18, 5)
+  approvingAmount  Decimal  @map("approving_amount") @db.Decimal(18, 5)
+  approvedAmount   Decimal  @map("approved_amount") @db.Decimal(18, 5)
+  ccpaymentStateId Int      @map("ccpayment_state")
+  state            CcpaymentState @relation(fields: [ccpaymentStateId], references: [code], onDelete: Restrict)
+  timeCreated      DateTime @map("timecreated")
+  timeUpdated      DateTime @map("timeupdated")
+  timeExpired      DateTime @map("timeexpired")
+  card             CcpaymentCard?
+  tickets          Ticket[]
+
+  @@index([ccpaymentStateId])
+  @@map("ccpayment")
+}
+
+model CcpaymentCard {
+  paymentId       BigInt  @id @map("ccpayment_id") // 1:1 with Ccpayment
+  payment         Ccpayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentTypeCode String  @map("payment_type") // CCTYPE
+  paymentType     CcpaymentType @relation(fields: [paymentTypeCode], references: [code], onDelete: Restrict)
+  isEncrypt       String? @map("is_encrypt") // Y/N
+  cardNumber      String? @map("card_number")
+  bankName        String? @map("bankname")
+  ccExpDate       Int?    @map("ccexpdate")
+  ccentryMethodId Int     @map("ccentry_method")
+  ccentryMethod   CcentryMethod @relation(fields: [ccentryMethodId], references: [code], onDelete: Restrict)
+
+  @@index([paymentTypeCode])
+  @@index([ccentryMethodId])
+  @@map("ccpayment_card")
+}
+
+// ---------------------------------------------------------------------------
+// Product and tickets
+// ---------------------------------------------------------------------------
+
+model Product {
+  id          Int     @id // PRODUCT_ID
+  typeId      Int     @map("type_id")
+  type        Type    @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  sizeCode    String  @map("size_code")
+  size        Size    @relation(fields: [sizeCode], references: [code], onDelete: Restrict)
+  colorCode   String  @map("color_code")
+  color       Color   @relation(fields: [colorCode], references: [code], onDelete: Restrict)
+  name        String  @map("product_name")
+  brandId     Int     @map("brand_id")
+  brand       Brand   @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  genderId    Int     @map("gender_id")
+  gender      Gender  @relation(fields: [genderId], references: [id], onDelete: Restrict)
+  description String?
+  ticketItems TicketItem[]
+
+  @@index([typeId])
+  @@index([sizeCode])
+  @@index([colorCode])
+  @@index([brandId])
+  @@index([genderId])
+  @@map("product")
+}
+
+model Ticket {
+  id            BigInt   @id // TICKET_ID
+  timePlaced    DateTime @map("timeplaced")
+  employeeId   Int      @map("employee_id")
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  customerId   Int      @map("customer_id")
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  totalProduct Decimal  @map("total_product") @db.Decimal(18, 5)
+  totalTax     Decimal  @map("total_tax") @db.Decimal(18, 5)
+  totalOrder   Decimal  @map("total_order") @db.Decimal(18, 5)
+  ccpaymentId  BigInt   @map("ccpayment_id")
+  ccpayment    Ccpayment @relation(fields: [ccpaymentId], references: [id], onDelete: Restrict)
+  items        TicketItem[]
+
+  @@index([employeeId])
+  @@index([customerId])
+  @@index([ccpaymentId])
+  @@index([timePlaced])
+  @@map("ticket")
+}
+
+model TicketItem {
+  ticketId       BigInt  @map("ticket_id")
+  ticket         Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  numSeq         Int     @map("numseq")
+  productId      Int     @map("product_id")
+  product        Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity       Decimal @db.Decimal(18, 5)
+  price          Decimal @db.Decimal(18, 5)
+  taxAmount      Decimal @map("tax_amount") @db.Decimal(18, 5)
+  productAmount  Decimal @map("product_amount") @db.Decimal(18, 5)
+
+  @@id([ticketId, numSeq])
+  @@index([productId])
+  @@map("ticket_item")
+}
+
+// ---------------------------------------------------------------------------
+// Chat sessions and conversation memory
+// ---------------------------------------------------------------------------
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+  chatEvents ChatEventLog[]
+  chatFeedback ChatFeedback[]
+  sessionFeatures SessionFeature?
+  correctionMemories CorrectionMemory[]
+  handoffQueueItems HandoffQueue[]
+  learningExclusionAudits LearningExclusionAudit[]
+
+  @@map("chat_session")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  sessionId String      @map("session_id")
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String      // "user" | "assistant"
+  content   String      @db.Text
+  traceJson String?     @map("trace_json") @db.Text
+  createdAt DateTime    @default(now())
+  chatEvents ChatEventLog[]
+  chatFeedback ChatFeedback[]
+  correctionMemories CorrectionMemory[]
+  handoffQueueItems HandoffQueue[]
+  learningExclusionAudits LearningExclusionAudit[]
+
+  @@index([sessionId, createdAt])
+  @@map("chat_message")
+}
+
+model ChatEventLog {
+  id              String      @id @default(uuid())
+  requestId       String      @map("request_id")
+  sessionId       String      @map("session_id")
+  turnIndex       Int         @map("turn_index")
+  eventType       String      @map("event_type")
+  messageId       String?     @map("message_id")
+  userId          Int?        @map("user_id")
+  customerId      Int?        @map("customer_id")
+  contentHash     String?     @map("content_hash")
+  contentRedacted String?     @map("content_redacted") @db.Text
+  payloadJson     String?     @map("payload_json") @db.Text
+  learningAllowed Boolean     @default(true) @map("learning_allowed")
+  learningExclusionReason String? @map("learning_exclusion_reason")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message   ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer  Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([sessionId, turnIndex])
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_event_log")
+}
+
+model ChatFeedback {
+  id              String      @id @default(uuid())
+  sessionId       String      @map("session_id")
+  messageId       String?     @map("message_id")
+  userId          Int?        @map("user_id")
+  customerId      Int?        @map("customer_id")
+  feedbackType    String      @map("feedback_type")
+  contentHash     String?     @map("content_hash")
+  contentRedacted String?     @map("content_redacted") @db.Text
+  payloadJson     String?     @map("payload_json") @db.Text
+  learningAllowed Boolean     @default(true) @map("learning_allowed")
+  learningExclusionReason String? @map("learning_exclusion_reason")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message   ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer  Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  correctionMemories CorrectionMemory[]
+
+  @@index([sessionId, createdAt])
+  @@index([messageId, createdAt])
+  @@index([feedbackType, createdAt])
+  @@map("chat_feedback")
+}
+
+model KnowledgeGapItem {
+  id              String   @id @default(uuid())
+  topicKey        String   @map("topic_key")
+  intent          String
+  status          String   @default("NEW")
+  owner           String?
+  triggerSource   String   @map("trigger_source")
+  score           Int
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  resolutionNotes String?  @map("resolution_notes") @db.Text
+  firstSeenAt     DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime @default(now()) @map("last_seen_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  verifiedAt      DateTime? @map("verified_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  lastRequestId   String?  @map("last_request_id")
+  lastSessionId   String?  @map("last_session_id")
+
+  @@unique([topicKey, intent])
+  @@index([status, lastSeenAt])
+  @@index([score, lastSeenAt])
+  @@map("knowledge_gap_items")
+}
+
+model SessionFeature {
+  sessionId                String   @id @map("session_id")
+  userId                   Int?     @map("user_id")
+  customerId               Int?     @map("customer_id")
+  turnIndex                Int      @default(0) @map("turn_index")
+  rephraseCount            Int      @default(0) @map("rephrase_count")
+  explainClicks            Int      @default(0) @map("explain_clicks")
+  handoffClicks            Int      @default(0) @map("handoff_clicks")
+  langPref                 String?  @map("lang_pref")
+  shortAnswerPref          Boolean? @map("short_answer_pref")
+  lastTqs                  Int?     @map("last_tqs")
+  lastKgs                  Int?     @map("last_kgs")
+  clarifyMode              Boolean  @default(false) @map("clarify_mode")
+  ragTopKOverride          Int?     @map("rag_top_k_override")
+  queryExpansionEnabled    Boolean  @default(false) @map("query_expansion_enabled")
+  wrqsWeightOverridesJson  String?  @map("wrqs_weight_overrides_json") @db.Text
+  adaptationExpiresTurn    Int?     @map("adaptation_expires_turn")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer  Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([customerId, updatedAt])
+  @@map("session_features")
+}
+
+model CorrectionMemory {
+  id                  String   @id @default(uuid())
+  sessionId           String   @map("session_id")
+  messageId           String?  @map("message_id")
+  userId              Int?     @map("user_id")
+  customerId          Int?     @map("customer_id")
+  sourceFeedbackId    String?  @map("source_feedback_id")
+  memoryScope         String   @map("memory_scope")
+  instructionRedacted String   @map("instruction_redacted") @db.Text
+  instructionHash     String   @map("instruction_hash")
+  consentLongTerm     Boolean  @default(false) @map("consent_long_term")
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  session        ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message        ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  sourceFeedback ChatFeedback? @relation(fields: [sourceFeedbackId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([userId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([memoryScope, createdAt])
+  @@map("correction_memory")
+}
+
+model HandoffQueue {
+  id          String   @id @default(uuid())
+  sessionId   String   @map("session_id")
+  messageId   String?  @map("message_id")
+  userId      Int?     @map("user_id")
+  customerId  Int?     @map("customer_id")
+  reasonCode  String   @map("reason_code")
+  priority    String   @default("MEDIUM")
+  status      String   @default("OPEN")
+  payloadJson String?  @map("payload_json") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  session  ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message  ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  user     User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([userId, createdAt])
+  @@map("handoff_queue")
+}
+
+model LearningJobRun {
+  id          String   @id @default(uuid())
+  jobType     String   @map("job_type")
+  windowStart DateTime @map("window_start") @db.Date
+  windowEnd   DateTime @map("window_end") @db.Date
+  status      String
+  summaryJson String?  @map("summary_json") @db.Text
+  configHash  String?  @map("config_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([jobType, windowStart, windowEnd])
+  @@index([jobType, createdAt])
+  @@map("learning_job_run")
+}
+
+model LearningDailyMetric {
+  id               String   @id @default(uuid())
+  metricDate       DateTime @unique @map("metric_date") @db.Date
+  avgTqs           Float    @default(0) @map("avg_tqs")
+  avgKgs           Float    @default(0) @map("avg_kgs")
+  rephraseRate     Float    @default(0) @map("rephrase_rate")
+  handoffRate      Float    @default(0) @map("handoff_rate")
+  feedbackDownRate Float    @default(0) @map("feedback_down_rate")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("learning_daily_metrics")
+}
+
+model LearningConsentPreference {
+  id                           String   @id @default(uuid())
+  userId                       Int      @unique @map("user_id")
+  customerId                   Int?     @map("customer_id")
+  longTermPersonalizationOptIn Boolean  @default(false) @map("long_term_personalization_opt_in")
+  telemetryLearningOptIn       Boolean  @default(true) @map("telemetry_learning_opt_in")
+  createdAt                    DateTime @default(now()) @map("created_at")
+  updatedAt                    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, updatedAt])
+  @@map("learning_consent_preference")
+}
+
+model LearningExclusionAudit {
+  id                  String    @id @default(uuid())
+  requestId           String    @map("request_id")
+  sessionId           String    @map("session_id")
+  messageId           String?   @map("message_id")
+  userId              Int?      @map("user_id")
+  customerId          Int?      @map("customer_id")
+  exclusionReasonCode String    @map("exclusion_reason_code")
+  policyReasonCode    String?   @map("policy_reason_code")
+  contentHash         String    @map("content_hash")
+  contentRedacted     String    @map("content_redacted") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  session  ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message  ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([sessionId, createdAt])
+  @@index([exclusionReasonCode, createdAt])
+  @@map("learning_exclusion_audit")
+}
+
+model WrqsConfigVersion {
+  id                 String   @id @default(uuid())
+  version            Int      @unique
+  positiveWeightsJson String  @map("positive_weights_json") @db.Text
+  penaltyWeightsJson String   @map("penalty_weights_json") @db.Text
+  sourceWindowStart  DateTime @map("source_window_start") @db.Date
+  sourceWindowEnd    DateTime @map("source_window_end") @db.Date
+  configHash         String   @map("config_hash")
+  isActive           Boolean  @default(false) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([isActive, createdAt])
+  @@map("wrqs_config_version")
+}
+
+model ReleaseComponentVersion {
+  id            String   @id @default(uuid())
+  componentKey  String   @map("component_key")
+  versionHash   String   @map("version_hash")
+  versionLabel  String?  @map("version_label")
+  status        String   @default("STABLE")
+  canaryPercent Int      @default(0) @map("canary_percent")
+  sourceJson    String?  @map("source_json") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([componentKey, versionHash])
+  @@index([componentKey, createdAt])
+  @@index([status, updatedAt])
+  @@map("release_component_version")
+}
+
+model GoldenConversationCase {
+  id                String   @id @default(uuid())
+  caseKey           String   @unique @map("case_key")
+  promptText        String   @map("prompt_text") @db.Text
+  expectedAllow     Boolean  @map("expected_allow")
+  expectedReasonCode String? @map("expected_reason_code")
+  expectedIntent    String?  @map("expected_intent")
+  forbiddenTermsJson String? @map("forbidden_terms_json") @db.Text
+  requiredTermsJson String?  @map("required_terms_json") @db.Text
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([enabled, updatedAt])
+  @@map("golden_conversation_case")
+}
+
+model GoldenConversationRun {
+  id              String   @id @default(uuid())
+  triggeredByUserId Int?   @map("triggered_by_user_id")
+  runWindowDays   Int      @default(7) @map("run_window_days")
+  passRate        Float    @default(0) @map("pass_rate")
+  status          String
+  failSummaryJson String?  @map("fail_summary_json") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  triggeredBy User? @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("golden_conversation_run")
+}
+
+model CanaryRolloutRun {
+  id                    String   @id @default(uuid())
+  triggeredByUserId     Int?     @map("triggered_by_user_id")
+  canaryPercent         Int      @map("canary_percent")
+  baselineMetricsJson   String?  @map("baseline_metrics_json") @db.Text
+  currentMetricsJson    String?  @map("current_metrics_json") @db.Text
+  rollbackTriggered     Boolean  @default(false) @map("rollback_triggered")
+  status                String
+  notes                 String?  @db.Text
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+
+  triggeredBy User? @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("canary_rollout_run")
+}
+
+model PolicyAudit {
+  id                   String   @id @default(uuid())
+  requestId            String   @map("request_id")
+  sessionId            String   @map("session_id")
+  userId               Int?     @map("user_id")
+  userState            String   @map("user_state")
+  message              String   @db.Text
+  policyIntent         String   @map("policy_intent")
+  policyDomain         String   @map("policy_domain")
+  classifierConfidence Float?   @map("classifier_confidence")
+  allow                Boolean
+  reasonCode           String?  @map("reason_code")
+  decisionSource       String   @map("decision_source")
+  traceJson            String?  @map("trace_json") @db.Text
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([sessionId, createdAt])
+  @@index([userId, createdAt])
+  @@map("policy_audit")
+}
