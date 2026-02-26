@@ -55,7 +55,7 @@ export function ChatbotFooter({ onSendMessage, disabled = false }: ChatbotFooter
     }
   }
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -100,14 +100,14 @@ export function ChatbotFooter({ onSendMessage, disabled = false }: ChatbotFooter
             <div className="text-sm text-red-500 font-medium">{voiceStatusLabel}</div>
           </div>
         ) : (
-          <input
-            type="text"
+          <textarea
+            rows={2}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             disabled={disabled}
-            className="flex-1 bg-transparent border-none outline-none text-sm text-[#1E2939] placeholder:text-[#99A1AF] disabled:opacity-50 min-w-0"
+            className="flex-1 bg-transparent border-none outline-none text-sm text-[#1E2939] placeholder:text-[#99A1AF] disabled:opacity-50 min-w-0 resize-none overflow-y-auto py-1"
           />
         )}
 
