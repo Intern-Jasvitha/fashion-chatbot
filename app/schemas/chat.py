@@ -55,6 +55,7 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, description="User message")
     session_id: Optional[str] = Field(None, description="Optional session id for conversation memory; omit to start a new session")
+    is_voice: bool = Field(False, description="True when message was sent via voice (mic); used for analytics and client UI hints.")
     selected_customer_name: Optional[str] = Field(
         None,
         description="Optional customer full name to scope responses when no customer is linked to the login.",

@@ -1,8 +1,8 @@
 import { getToken, useAuthStore } from '@/stores/auth-store'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
+export const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
-function authHeaders(): HeadersInit {
+export function authHeaders(): HeadersInit {
   const token = getToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) {
@@ -192,14 +192,20 @@ export async function getChatHistory(sessionId: string): Promise<ChatHistoryResp
 export async function postChat(
   message: string,
   sessionId?: string | null,
-  language?: string | null
+  language?: string | null,
+  isVoice?: boolean
 ): Promise<ChatResponse> {
-  const body: { message: string; session_id?: string; language?: string } = { message }
+  const body: { message: string; session_id?: string; language?: string; is_voice?: boolean } = {
+    message,
+  }
   if (sessionId != null && sessionId !== '') {
     body.session_id = sessionId
   }
   if (language != null && language !== '') {
     body.language = language
+  }
+  if (isVoice === true) {
+    body.is_voice = true
   }
   const res = await fetch(`${API_BASE}/api/v1/chat`, {
     method: 'POST',
@@ -212,6 +218,20 @@ export async function postChat(
     throw new Error(text || `Request failed: ${res.status}`)
   }
   return res.json()
+}
+
+export async function postTTS(text: string): Promise<ArrayBuffer> {
+  const res = await fetch(`${API_BASE}/api/v1/voice/tts`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ text }),
+  })
+  handleResponse(res)
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(errText || 'TTS request failed')
+  }
+  return res.arrayBuffer()
 }
 
 export async function postChatFeedback(body: ChatFeedbackRequest): Promise<ChatFeedbackResponse> {

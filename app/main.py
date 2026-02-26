@@ -66,7 +66,11 @@ app = FastAPI(
 
 # Auth: paths under /api/v1 that do not require JWT
 API_V1_AUTH_PATHS = ("/api/v1/auth/login", "/api/v1/auth/signup", "/api/v1/auth/logout")
-API_V1_GUEST_ALLOWED = {("POST", "/api/v1/chat"), ("POST", "/api/v1/chat/")}
+API_V1_GUEST_ALLOWED = {
+    ("POST", "/api/v1/chat"),
+    ("POST", "/api/v1/chat/"),
+    ("POST", "/api/v1/voice/tts"),
+}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

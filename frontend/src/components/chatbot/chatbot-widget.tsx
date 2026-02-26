@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useChatSession } from '@/contexts/chat-session-context'
 import { ChatbotHeader } from './chatbot-header'
 import { ChatbotMessages } from './chatbot-messages'
-import { ChatbotFooter } from './chatbot-footer'
+import { ChatbotFooter, type SendMessageOptions } from './chatbot-footer'
 import { ChatbotButton } from './chatbot-button'
 import { ChatbotSettings } from './chatbot-settings'
 import { ChatbotEmailModal } from './chatbot-email-modal'
@@ -25,6 +25,8 @@ export interface Message {
   timestamp: Date
   backendMessageId?: string
   feedbackType?: 'UP' | 'DOWN' | null
+  isVoice?: boolean
+  isVoiceResponse?: boolean
 }
 
 type View = 'chat' | 'settings'
@@ -50,6 +52,7 @@ export function ChatbotWidget() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isVoiceTurnLoading, setIsVoiceTurnLoading] = useState(false)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [feedbackTargetMessageId, setFeedbackTargetMessageId] = useState<string | null>(null)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
@@ -99,21 +102,28 @@ export function ChatbotWidget() {
     }
   }, [isGuest])
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+    content: string,
+    options?: SendMessageOptions
+  ): Promise<string | void> => {
+    const isVoice = options?.isVoice === true
+
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       content,
       timestamp: new Date(),
+      isVoice: isVoice || undefined,
     }
     setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
+    if (isVoice) setIsVoiceTurnLoading(true)
 
     // Use shared session (from main chat) when available so both use same backend session
     const sessionToUse = chatSession?.sharedBackendSessionId ?? sessionId
 
     try {
-      const response = await postChat(content, sessionToUse, selectedLanguage)
+      const response = await postChat(content, sessionToUse, selectedLanguage, isVoice)
       const newSessionId = response.session_id ?? null
       setSessionId(newSessionId)
       chatSession?.setSharedBackendSessionId(newSessionId)
@@ -124,8 +134,10 @@ export function ChatbotWidget() {
         timestamp: new Date(),
         backendMessageId: response.assistant_message_id ?? undefined,
         feedbackType: null,
+        isVoiceResponse: isVoice || undefined,
       }
       setMessages((prev) => [...prev, assistantMessage])
+      return response.content ?? ''
     } catch (err) {
       const errorContent =
         err instanceof Error ? err.message : 'Something went wrong. Please try again.'
@@ -136,8 +148,10 @@ export function ChatbotWidget() {
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
+      return undefined
     } finally {
       setIsLoading(false)
+      setIsVoiceTurnLoading(false)
     }
   }
 
@@ -288,6 +302,7 @@ export function ChatbotWidget() {
                   messages={messages}
                   assistantAvatar={assistantAvatar}
                   isLoading={isLoading}
+                  isVoiceTurnLoading={isVoiceTurnLoading}
                   isGuest={isGuest}
                   onRequireSignIn={handleRequireSignIn}
                   onFeedback={handleFeedback}

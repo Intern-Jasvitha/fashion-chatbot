@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # LLM chat API (intent router, etc.)
     LLAMA_URL: str
 
+    # OpenAI (Realtime API for voice)
+    OPENAI_API_KEY: str = ""
+
     # Phase flags
     ENABLE_PHASE3_SQL_SECURITY: bool = True
     ENABLE_PHASE4_RAG_GROUNDING: bool = True
