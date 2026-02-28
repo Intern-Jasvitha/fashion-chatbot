@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # OpenAI (Realtime API for voice)
     OPENAI_API_KEY: str = ""
 
+    # TTS backend: when True use VibeVoice at VIBEVOICE_URL, when False use OpenAI
+    ISVIBEVOICE: bool = False
+    VIBEVOICE_URL: str = "http://localhost:3000"
+
     # Phase flags
     ENABLE_PHASE3_SQL_SECURITY: bool = True
     ENABLE_PHASE4_RAG_GROUNDING: bool = True
