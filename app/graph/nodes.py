@@ -39,7 +39,7 @@ from app.services.sql_query_plan import (
     inject_mandatory_scope,
     parse_query_plan,
 )
-from app.services.sql_agent_simple import run_simple_sql_agent
+from app.services.sql_agent import run_sql_agent
 from app.services.sql_validator import (
     SqlValidationError,
     enforce_customer_scope,
@@ -941,7 +941,7 @@ async def sql_node(
 
     simple_start = time.perf_counter()
     try:
-        result = await run_simple_sql_agent(
+        result = await run_sql_agent(
             message=message,
             settings=settings,
             qdrant=qdrant_client,
@@ -950,21 +950,21 @@ async def sql_node(
             customer_name=customer_name,
         )
     except Exception as e:
-        logger.exception("run_simple_sql_agent failed: %s", e)
+        logger.exception("run_sql_agent failed: %s", e)
         answer = "I ran into an error while querying the database. Please try again or rephrase."
         _append_step(
             trace,
-            step="simple_sql_agent",
+            step="sql_agent",
             agent="sql_agent",
             status="error",
-            summary="Simple SQL agent failed.",
+            summary="SQL agent failed.",
             duration_ms=_duration_ms(simple_start),
             details={"error": _truncate_text(e, 500)},
         )
         return {
             "messages": [AIMessage(content=answer)],
             "sql_result": answer,
-            "sql_metadata": {"had_error": True, "simple_sql_agent_error": True},
+            "sql_metadata": {"had_error": True, "sql_agent_error": True},
             "debug_trace": trace,
         }
 
@@ -979,10 +979,10 @@ async def sql_node(
     }
     _append_step(
         trace,
-        step="simple_sql_agent",
+        step="sql_agent",
         agent="sql_agent",
         status="ok" if not had_error else "error",
-        summary="Ran simple SQL agent (LLM → SQL → Execute → Format).",
+        summary="Ran SQL agent (LLM → SQL → Execute → Format).",
         duration_ms=_duration_ms(simple_start),
         details={"row_count": sql_metadata["row_count"]},
     )

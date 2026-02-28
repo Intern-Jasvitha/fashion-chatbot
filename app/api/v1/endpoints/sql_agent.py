@@ -10,7 +10,7 @@ from app.api.dependencies import get_current_user, get_prisma, get_qdrant
 from app.core.config import get_settings
 from app.schemas.auth import UserOut
 from app.schemas.sql_agent import SQLAgentRequest, SQLAgentResponse
-from app.services.sql_agent_simple import run_simple_sql_agent
+from app.services.sql_agent import run_sql_agent
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ async def post_sql_agent(
         )
 
     try:
-        result = await run_simple_sql_agent(
+        result = await run_sql_agent(
             message=body.message,
             settings=settings,
             qdrant=qdrant,
