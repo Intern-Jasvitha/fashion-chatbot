@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     # JWT auth
     SECRET_KEY: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_DAYS: int = 1
     API_V1_STR: str = "/api/v1"
 
     # Qdrant (Docker / local)

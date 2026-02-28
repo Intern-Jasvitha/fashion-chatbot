@@ -24,8 +24,6 @@ def gate_candidate(candidate: Candidate, context: CandidateContext) -> GateResul
             details={"policy_reason_code": context.policy_reason_code},
         )
 
-    # Note: Question-level SQL blocking removed - SQL-level validation handles scoping
-
     if context.user_state.upper() == UserState.GUEST.value and candidate.candidate_id == "r_sql":
         return GateResult(
             allow=False,

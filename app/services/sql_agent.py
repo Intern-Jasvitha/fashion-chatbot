@@ -234,8 +234,7 @@ async def run_sql_agent(
             
             sql = _extract_sql(llm_response)
             logger.info("Simple SQL Agent | Generated SQL:\n%s", sql)
-            
-            # Validate it's a safe SELECT query
+
             if not _is_safe_select_query(sql):
                 raise ValueError("Generated SQL failed safety validation")
             

@@ -22,8 +22,6 @@ def _to_customer_out(customer) -> CustomerOut:
 
 async def register(prisma: Prisma, user_in: UserCreate) -> UserOut:
     """Create new user. Raises ValueError if email already registered."""
-
-    # Check if email exists
     existing = await prisma.user.find_unique(
         where={"email": user_in.email}
     )

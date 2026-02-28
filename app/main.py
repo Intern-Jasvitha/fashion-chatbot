@@ -7,8 +7,7 @@ load_dotenv()  # Load .env before any LangChain/LangGraph code so tracing env va
 import logging
 from contextlib import asynccontextmanager
 
-# Ensure app loggers (e.g. app.graph.nodes, app.services.sql_agent) show INFO in the console.
-# Without this, only uvicorn logs appear and SQL/LLM debug logs are hidden.
+# App loggers (e.g. app.graph.nodes) need INFO so SQL/LLM logs appear alongside uvicorn.
 _app_log = logging.getLogger("app")
 _app_log.setLevel(logging.INFO)
 if not _app_log.handlers:

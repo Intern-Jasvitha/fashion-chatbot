@@ -408,7 +408,6 @@ _ON_COND_RE = re.compile(
 
 
 def _normalize_join_on_condition(cond: Any) -> Optional[dict[str, str]]:
-    # Handle proper format: {"left_table": "t", "left_column": "id", ...}
     if isinstance(cond, dict):
         if all(k in cond for k in ("left_table", "left_column", "right_table", "right_column")):
             return {
@@ -429,8 +428,7 @@ def _normalize_join_on_condition(cond: Any) -> Optional[dict[str, str]]:
                     "right_table": m.group("rt"),
                     "right_column": m.group("rc"),
                 }
-    
-    # Handle string format: "t.id = ti.ticket_id"
+
     elif isinstance(cond, str):
         m = _ON_COND_RE.search(cond)
         if m:
@@ -503,7 +501,6 @@ def _normalize_query_plan_payload(payload: dict[str, Any]) -> dict[str, Any]:
     for f in data.get("filters", []):
         if isinstance(f, dict):
             f = dict(f)
-            # Ensure 'table' field exists
             if "table" not in f and "base_alias" in data:
                 f["table"] = data["base_alias"]
             
@@ -521,7 +518,6 @@ def _normalize_query_plan_payload(payload: dict[str, Any]) -> dict[str, Any]:
     for o in data.get("order_by", []):
         if isinstance(o, dict):
             o = dict(o)
-            # Ensure 'table' field exists
             if "table" not in o and "base_alias" in data:
                 o["table"] = data["base_alias"]
             # Normalize direction to lowercase
@@ -673,7 +669,6 @@ def inject_mandatory_scope(
             logger.warning(f"DROPPED invalid filter: {f.column} {f.operator} {f.value}")
     scoped.filters = clean_filters
 
-    # Ensure customer_id filter is always present on ticket
     if {"ticket", "ticket_item"} & tables:
         if customer_id is None:
             raise QueryPlanError("Missing customer scope")

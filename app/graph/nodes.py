@@ -478,8 +478,6 @@ async def rag_node(
     trace = _ensure_trace(state, message)
     _mark_called_agent(trace, "rag_agent")
 
-    # Note: Question-level blocking removed - SQL-level validation handles scoping
-
     history = _history_from_messages(state.get("messages", []) or [])
     correction_hint_msg = _correction_hint_message(state)
     lang_pref = state.get("lang_pref")
@@ -1020,8 +1018,6 @@ async def hybrid_node(
 
     trace = _ensure_trace(state, message)
     _mark_called_agent(trace, "hybrid_agent")
-
-    # Note: Question-level blocking removed - SQL-level validation handles scoping
 
     history = _history_from_messages(state.get("messages", []) or [])
     correction_hint_msg = _correction_hint_message(state)
